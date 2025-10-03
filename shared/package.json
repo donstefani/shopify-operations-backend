@@ -1,0 +1,29 @@
+{
+  "name": "@operations-manager/shared",
+  "version": "1.0.0",
+  "description": "Shared utilities and configurations for operations manager microservices",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "mysql2": "^3.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "exports": {
+    "./database": {
+      "types": "./dist/database/index.d.ts",
+      "default": "./dist/database/index.js"
+    },
+    "./types": {
+      "types": "./dist/types/index.d.ts", 
+      "default": "./dist/types/index.js"
+    }
+  }
+}

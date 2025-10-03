@@ -1,0 +1,88 @@
+service: operations-event-manager
+
+useDotenv: true
+
+provider:
+  name: aws
+  runtime: nodejs22.x
+  region: us-east-1
+  environment:
+    # Shopify Configuration
+    SHOPIFY_CLIENT_ID: ${env:SHOPIFY_CLIENT_ID}
+    SHOPIFY_CLIENT_SECRET: ${env:SHOPIFY_CLIENT_SECRET}
+    SHOPIFY_API_VERSION: ${env:SHOPIFY_API_VERSION}
+    SHOPIFY_WEBHOOK_SECRET: ${env:SHOPIFY_WEBHOOK_SECRET}
+    
+    # Database Configuration
+    DB_HOST: ${env:DB_HOST}
+    DB_PORT: ${env:DB_PORT}
+    DB_NAME: ${env:DB_NAME}
+    DB_USERNAME: ${env:DB_USERNAME}
+    DB_PASSWORD: ${env:DB_PASSWORD}
+    DB_SSL: ${env:DB_SSL}
+    
+    # AWS Configuration
+    NODE_ENV: ${env:NODE_ENV}
+    LOG_LEVEL: ${env:LOG_LEVEL, 'info'}
+    AWS_DYNAMODB_TABLE: ${env:AWS_DYNAMODB_TABLE}
+    ENCRYPTION_KEY: ${env:ENCRYPTION_KEY}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:Query
+            - dynamodb:Scan
+          Resource: 
+            - "arn:aws:dynamodb:us-east-1:767398030559:table/portfolio-shopify-auth"
+
+plugins:
+  - serverless-offline
+
+package:
+  individually: true
+  patterns:
+    - '!src/**'
+    - '!test/**'
+    - '!*.md'
+    - '!eslint.config.js'
+    - '!tsconfig.json'
+    - '!jest.config.js'
+    - 'node_modules/**'
+    - 'dist/**'
+    - 'handler.js'
+    - 'package.json'
+
+functions:
+  webhook-processor:
+    handler: handler.handler
+    events:
+      - http:
+          path: /{proxy+}
+          method: ANY
+          cors: true
+      - http:
+          path: /
+          method: ANY
+          cors: true
+
+custom:
+  serverless-offline:
+    httpPort: 3001
+    host: 0.0.0.0
+    lambdaPort: 3003
+    cors:
+      origin: "*"
+      headers:
+        - Content-Type
+        - X-Shopify-Hmac-Sha256
+        - X-Shopify-Shop-Domain
+        - X-Shopify-Topic
+        - X-Shopify-Webhook-Id
+      allowCredentials: true
+
+# Note: Using DynamoDB table 'portfolio-shopify-auth' 
+# created by the shopify-auth-service deployment

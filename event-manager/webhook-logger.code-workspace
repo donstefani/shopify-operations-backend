@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "../webhook-logger"
+		},
+		{
+			"path": "../shopify-auth-service"
+		},
+		{
+			"path": "."
+		}
+	],
+	"settings": {}
+}

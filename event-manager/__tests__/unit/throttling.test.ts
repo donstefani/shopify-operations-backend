@@ -5,11 +5,11 @@
  * retry logic, backoff calculations, and rate limit handling.
  */
 
-import { ThrottlingService } from '../src/services/core/throttling.service';
-import { ThrottlingConfig, ThrottlingContext } from '../src/types/errors.types';
+import { ThrottlingService } from '../../src/services/core/throttling.service';
+import { ThrottlingConfig, ThrottlingContext } from '../../src/types/errors.types';
 
 // Mock the error handling service
-jest.mock('../src/services/core/error-handling.service', () => ({
+jest.mock('../../src/services/core/error-handling.service', () => ({
   errorHandlingService: {
     handleGraphQLError: jest.fn().mockResolvedValue(undefined)
   }

@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { WebhookService } from '../services/index.js';
-import { WebhookRegistration } from '../types/webhook.types.js';
-import EventManagerDatabaseService from '../services/database.service.js';
+import { WebhookService } from '../services/index';
+import { WebhookRegistration } from '../types/webhook.types';
+import EventManagerDatabaseService from '../services/database.service';
 
 const router = Router();
 const webhookService = new WebhookService();

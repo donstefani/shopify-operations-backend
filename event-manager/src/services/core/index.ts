@@ -25,4 +25,4 @@ export * from '../../types/errors.types';
 export * from '../../schemas/validation.schemas';
 
 // Future core services will be exported here:
-// export { RetryService } from './retry.service.js';
+// export { RetryService } from './retry.service';

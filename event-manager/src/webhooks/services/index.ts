@@ -1,7 +1,7 @@
-import { WebhookRequest, WebhookHandlerResult, WEBHOOK_TOPICS } from '../types/index.js';
-import { productClient, orderClient, customerClient } from '../../services/clients/index.js';
-import { errorHandlingService } from '../../services/core/index.js';
-import EventManagerDatabaseService from '../../services/database.service.js';
+import { WebhookRequest, WebhookHandlerResult, WEBHOOK_TOPICS } from '../types/index';
+import { productClient, orderClient, customerClient } from '../../services/clients/index';
+import { errorHandlingService } from '../../services/core/index';
+import EventManagerDatabaseService from '../../services/database.service';
 
 /**
  * Webhook Event Handlers

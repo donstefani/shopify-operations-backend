@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Shared utilities and configurations for operations manager microservices",
   "main": "index.js",
-  "type": "module",
+  "type": "commonjs",
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",

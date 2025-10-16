@@ -3,7 +3,7 @@
  * Provides database configuration and connection utilities
  */
 
-export { DatabaseConnection } from './connection.js';
+export { DatabaseConnection } from './connection';
 export { 
   DatabaseConfig,
   getDatabaseConfig,
@@ -12,6 +12,6 @@ export {
   getCustomerManagerDbConfig,
   getOrderManagerDbConfig,
   getProductManagerDbConfig
-} from './config/database.config.js';
+} from './config/database.config';
 
-export { DatabaseConnection as default } from './connection.js';
+export { DatabaseConnection as default } from './connection';

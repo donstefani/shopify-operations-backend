@@ -1,8 +1,8 @@
 import express from 'express';
 import helmet from 'helmet';
-import { webhookRoutes, captureRawBody, logWebhookEvent } from './webhooks/index.js';
-import webhookManagementRoutes from './routes/webhook-management.js';
-import { errorHandlingService, ErrorSeverity, ErrorCategory } from './services/index.js';
+import { webhookRoutes, captureRawBody, logWebhookEvent } from './webhooks/index';
+import webhookManagementRoutes from './routes/webhook-management';
+import { errorHandlingService, ErrorSeverity, ErrorCategory } from './services/index';
 
 const app = express();
 

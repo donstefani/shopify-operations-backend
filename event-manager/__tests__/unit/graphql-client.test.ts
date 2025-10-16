@@ -5,11 +5,11 @@
  * query execution, error handling, and integration with throttling service.
  */
 
-import { BaseGraphQLClient } from '../src/services/core/graphql-client.service';
-import { GraphQLRequest, GraphQLClientContext, GraphQLClientConfig } from '../src/types/errors.types';
+import { BaseGraphQLClient } from '../../src/services/core/graphql-client.service';
+import { GraphQLRequest, GraphQLClientContext, GraphQLClientConfig } from '../../src/types/errors.types';
 
 // Mock the throttling service
-jest.mock('../src/services/core/throttling.service', () => ({
+jest.mock('../../src/services/core/throttling.service', () => ({
   throttlingService: {
     executeWithThrottling: jest.fn(),
     parseRateLimitHeaders: jest.fn()
@@ -17,7 +17,7 @@ jest.mock('../src/services/core/throttling.service', () => ({
 }));
 
 // Mock the error handling service
-jest.mock('../src/services/core/error-handling.service', () => ({
+jest.mock('../../src/services/core/error-handling.service', () => ({
   errorHandlingService: {
     handleGraphQLError: jest.fn().mockResolvedValue(undefined)
   }
@@ -26,8 +26,8 @@ jest.mock('../src/services/core/error-handling.service', () => ({
 // Mock fetch
 global.fetch = jest.fn();
 
-const mockThrottlingService = require('../src/services/core/throttling.service').throttlingService;
-const mockErrorHandlingService = require('../src/services/core/error-handling.service').errorHandlingService;
+const mockThrottlingService = require('../../src/services/core/throttling.service').throttlingService;
+const mockErrorHandlingService = require('../../src/services/core/error-handling.service').errorHandlingService;
 
 describe('BaseGraphQLClient', () => {
   let graphqlClient: BaseGraphQLClient;

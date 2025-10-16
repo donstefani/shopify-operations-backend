@@ -1,6 +1,6 @@
 import { Response, NextFunction } from 'express';
 import crypto from 'crypto';
-import { WebhookRequest } from '../types/index.js';
+import { WebhookRequest } from '../types/index';
 
 /**
  * Webhook Middleware

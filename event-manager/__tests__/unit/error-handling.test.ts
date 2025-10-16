@@ -5,8 +5,8 @@
  * email notifications, error categorization, and rate limiting.
  */
 
-import { ErrorHandlingService } from '../src/services/core/error-handling.service';
-import { ErrorSeverity, ErrorCategory } from '../src/types/errors.types';
+import { ErrorHandlingService } from '../../src/services/core/error-handling.service';
+import { ErrorSeverity, ErrorCategory } from '../../src/types/errors.types';
 
 // Mock nodemailer
 jest.mock('nodemailer', () => ({

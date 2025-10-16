@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
-import { webhookHandlerRegistry } from '../services/index.js';
-import { WebhookRequest } from '../types/index.js';
+import { webhookHandlerRegistry } from '../services/index';
+import { WebhookRequest } from '../types/index';
 
 const router = Router();
 

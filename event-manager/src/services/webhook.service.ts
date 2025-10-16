@@ -1,7 +1,7 @@
-import { TokenService } from './token.service.js';
-import { BaseGraphQLClient } from './core/graphql-client.service.js';
-import { GraphQLRequest, GraphQLClientContext } from '../types/errors.types.js';
-import { WebhookRegistration, ShopifyWebhook, WebhookApiResponse } from '../types/webhook.types.js';
+import { TokenService } from './token.service';
+import { BaseGraphQLClient } from './core/graphql-client.service';
+import { GraphQLRequest, GraphQLClientContext } from '../types/errors.types';
+import { WebhookRegistration, ShopifyWebhook, WebhookApiResponse } from '../types/webhook.types';
 
 /**
  * Webhook Service for Event Processor

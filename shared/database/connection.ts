@@ -4,7 +4,7 @@
  */
 
 import mysql from 'mysql2/promise';
-import { DatabaseConfig, getDatabaseConfig } from './config/database.config.js';
+import { DatabaseConfig, getDatabaseConfig } from './config/database.config';
 
 export class DatabaseConnection {
   private static instance: DatabaseConnection;

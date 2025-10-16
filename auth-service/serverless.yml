@@ -1,0 +1,75 @@
+service: shopify-auth-service
+
+useDotenv: true
+
+provider:
+  name: aws
+  runtime: nodejs22.x
+  region: us-east-1
+  environment:
+    # Non-sensitive configuration
+    SHOPIFY_API_VERSION: ${env:SHOPIFY_API_VERSION}
+    SHOPIFY_SCOPES: ${env:SHOPIFY_SCOPES}
+    AWS_DYNAMODB_TABLE: ${env:AWS_DYNAMODB_TABLE}
+    NODE_ENV: ${env:NODE_ENV}
+    
+    # Sensitive data from AWS Parameter Store
+    SHOPIFY_CLIENT_ID: ${ssm:/shopify-auth/SHOPIFY_CLIENT_ID}
+    SHOPIFY_CLIENT_SECRET: ${ssm:/shopify-auth/SHOPIFY_CLIENT_SECRET}
+    SHOPIFY_REDIRECT_URI: ${ssm:/shopify-auth/SHOPIFY_REDIRECT_URI}
+    SESSION_SECRET: ${ssm:/shopify-auth/SESSION_SECRET}
+    ENCRYPTION_KEY: ${ssm:/shopify-auth/ENCRYPTION_KEY}
+  
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:DescribeTable
+          Resource: 
+            - "arn:aws:dynamodb:us-east-1:767398030559:table/portfolio-shopify-auth"
+        - Effect: Allow
+          Action:
+            - ssm:GetParameter
+            - ssm:GetParameters
+            - ssm:GetParametersByPath
+          Resource:
+            - "arn:aws:ssm:us-east-1:767398030559:parameter/shopify-auth/*"
+
+functions:
+  api:
+    handler: src/handler.handler
+    events:
+      - http:
+          path: /{proxy+}
+          method: ANY
+          cors: true
+      - http:
+          path: /
+          method: ANY
+          cors: true
+
+plugins:
+  - serverless-offline
+
+custom:
+  serverless-offline:
+    httpPort: 3000
+    host: 0.0.0.0
+    cors:
+      origin: "*"
+      headers:
+        - Content-Type
+        - Authorization
+        - Cookie
+        - Set-Cookie
+      allowCredentials: true
+
+# Note: Using existing DynamoDB table 'portfolio-shopify-auth' 
+# created by the initial deployment

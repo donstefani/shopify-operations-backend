@@ -16,6 +16,16 @@ router.post('/:topic/:action', async (req: WebhookRequest, res: Response) => {
       req.webhookTopic = `${req.params['topic']}/${req.params['action']}`;
     }
     
+    // Set shop domain from headers if not already set
+    if (!req.webhookShop) {
+      req.webhookShop = req.get('X-Shopify-Shop-Domain') || req.get('x-shopify-shop-domain') || 'unknown';
+    }
+    
+    // Set webhook ID from headers if not already set
+    if (!req.webhookId) {
+      req.webhookId = req.get('X-Shopify-Webhook-Id') || req.get('x-shopify-webhook-id');
+    }
+    
     console.log('Webhook route hit (with action):', req.webhookTopic, req.body);
     // Process webhook using the handler registry
     const result = await webhookHandlerRegistry.handleWebhook(req.body, req);
@@ -53,6 +63,16 @@ router.post('/:topic', async (req: WebhookRequest, res: Response) => {
     // Set webhook topic from URL parameter if not already set by middleware
     if (!req.webhookTopic && req.params['topic']) {
       req.webhookTopic = req.params['topic'];
+    }
+    
+    // Set shop domain from headers if not already set
+    if (!req.webhookShop) {
+      req.webhookShop = req.get('X-Shopify-Shop-Domain') || req.get('x-shopify-shop-domain') || 'unknown';
+    }
+    
+    // Set webhook ID from headers if not already set
+    if (!req.webhookId) {
+      req.webhookId = req.get('X-Shopify-Webhook-Id') || req.get('x-shopify-webhook-id');
     }
     
     console.log('Webhook route hit:', req.params['topic'], req.body);

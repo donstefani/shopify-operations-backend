@@ -2,6 +2,7 @@ import { WebhookRequest, WebhookHandlerResult, WEBHOOK_TOPICS } from '../types/i
 import { productClient, orderClient, customerClient } from '../../services/clients/index';
 import { errorHandlingService } from '../../services/core/index';
 import EventManagerDatabaseService from '../../services/database.service';
+import { TokenService } from '../../services/token.service';
 
 /**
  * Webhook Event Handlers
@@ -11,9 +12,11 @@ import EventManagerDatabaseService from '../../services/database.service';
 
 export abstract class BaseWebhookHandler {
   protected db: EventManagerDatabaseService;
+  protected tokenService: TokenService;
   
   constructor() {
     this.db = new EventManagerDatabaseService();
+    this.tokenService = new TokenService();
   }
   
   abstract handle(data: any, req: WebhookRequest): Promise<WebhookHandlerResult>;
@@ -52,6 +55,23 @@ export abstract class BaseWebhookHandler {
       } catch (error) {
         console.error('Failed to update event status in database:', error);
       }
+    }
+  }
+
+  /**
+   * Get access token for a shop from auth-service
+   */
+  protected async getAccessToken(shopDomain: string): Promise<string | null> {
+    try {
+      const tokenData = await this.tokenService.getToken(shopDomain);
+      if (!tokenData) {
+        console.warn(`⚠️  No access token found for shop: ${shopDomain}`);
+        return null;
+      }
+      return tokenData.accessToken;
+    } catch (error) {
+      console.error(`Failed to get access token for ${shopDomain}:`, error);
+      return null;
     }
   }
 }
@@ -114,6 +134,17 @@ export class ProductWebhookHandler extends BaseWebhookHandler {
     });
     
     try {
+      // Get access token for the shop
+      const accessToken = await this.getAccessToken(shop);
+      if (!accessToken) {
+        // Log webhook but skip Shopify API call if no token
+        return {
+          success: true,
+          message: 'Product creation webhook logged (Shopify API sync skipped - no access token)',
+          data: { productId: data.id, action: 'created', synchronized: false, reason: 'no_token' }
+        };
+      }
+
       // Fetch full product data using GraphQL client
       const result = await productClient.getProduct(
         `gid://shopify/Product/${data.id}`,
@@ -122,11 +153,17 @@ export class ProductWebhookHandler extends BaseWebhookHandler {
           operation: 'getProduct',
           requestId: `webhook-${Date.now()}`,
           additionalData: { webhookEvent: 'product_create' }
+        },
+        {
+          shopDomain: shop,
+          accessToken: accessToken,
+          apiVersion: process.env['SHOPIFY_API_VERSION'] || '2024-01'
         }
       );
 
       if (result.success && result.data) {
         const productData = (result.data.data as any)?.product;
+        
         if (productData) {
           // TODO: Normalize and store product data in company database
           // Product data structure ready for database storage:
@@ -362,6 +399,17 @@ export class OrderWebhookHandler extends BaseWebhookHandler {
     });
     
     try {
+      // Get access token for the shop
+      const accessToken = await this.getAccessToken(shop);
+      if (!accessToken) {
+        // Log webhook but skip Shopify API call if no token
+        return {
+          success: true,
+          message: 'Order creation webhook logged (Shopify API sync skipped - no access token)',
+          data: { orderId: data.id, action: 'created', synchronized: false, reason: 'no_token' }
+        };
+      }
+
       // Fetch full order data using GraphQL client
       const result = await orderClient.getOrder(
         `gid://shopify/Order/${data.id}`,
@@ -370,6 +418,11 @@ export class OrderWebhookHandler extends BaseWebhookHandler {
           operation: 'getOrder',
           requestId: `webhook-${Date.now()}`,
           additionalData: { webhookEvent: 'order_create' }
+        },
+        {
+          shopDomain: shop,
+          accessToken: accessToken,
+          apiVersion: process.env['SHOPIFY_API_VERSION'] || '2024-01'
         }
       );
 
@@ -578,6 +631,17 @@ export class CustomerWebhookHandler extends BaseWebhookHandler {
     });
     
     try {
+      // Get access token for the shop
+      const accessToken = await this.getAccessToken(shop);
+      if (!accessToken) {
+        // Log webhook but skip Shopify API call if no token
+        return {
+          success: true,
+          message: 'Customer creation webhook logged (Shopify API sync skipped - no access token)',
+          data: { customerId: data.id, action: 'created', synchronized: false, reason: 'no_token' }
+        };
+      }
+
       // Fetch full customer data using GraphQL client
       const result = await customerClient.getCustomer(
         `gid://shopify/Customer/${data.id}`,
@@ -586,6 +650,11 @@ export class CustomerWebhookHandler extends BaseWebhookHandler {
           operation: 'getCustomer',
           requestId: `webhook-${Date.now()}`,
           additionalData: { webhookEvent: 'customer_create' }
+        },
+        {
+          shopDomain: shop,
+          accessToken: accessToken,
+          apiVersion: process.env['SHOPIFY_API_VERSION'] || '2024-01'
         }
       );
 

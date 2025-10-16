@@ -46,9 +46,6 @@ export class ProductClient extends BaseGraphQLClient {
               sku
               barcode
               inventoryQuantity
-              weight
-              weightUnit
-              requiresShipping
               taxable
               inventoryItem {
                 id
@@ -154,9 +151,6 @@ export class ProductClient extends BaseGraphQLClient {
               sku
               barcode
               inventoryQuantity
-              weight
-              weightUnit
-              requiresShipping
               taxable
               inventoryItem {
                 id

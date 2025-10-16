@@ -96,9 +96,21 @@ export const verifyWebhookHMAC = (secret: string) => {
  */
 export const logWebhookEvent = (req: WebhookRequest, _res: Response, next: NextFunction): void => {
   if (req.method === 'POST' && req.path.includes('/webhooks/')) {
-    const topic = req.webhookTopic || 'unknown';
-    const shop = req.webhookShop || 'unknown';
-    const webhookId = req.webhookId || 'unknown';
+    // Extract webhook metadata from headers if not already set
+    // Try both lowercase (serverless-http normalizes) and original case
+    if (!req.webhookTopic) {
+      req.webhookTopic = req.get('X-Shopify-Topic') || req.get('x-shopify-topic') || 'unknown';
+    }
+    if (!req.webhookShop) {
+      req.webhookShop = req.get('X-Shopify-Shop-Domain') || req.get('x-shopify-shop-domain') || 'unknown';
+    }
+    if (!req.webhookId) {
+      req.webhookId = req.get('X-Shopify-Webhook-Id') || req.get('x-shopify-webhook-id') || 'unknown';
+    }
+    
+    const topic = req.webhookTopic;
+    const shop = req.webhookShop;
+    const webhookId = req.webhookId;
     
     console.log('Webhook event received:', {
       topic,

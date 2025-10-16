@@ -42,9 +42,9 @@ export class DatabaseConnection {
         waitForConnections: true,
         connectionLimit: this.config.pool?.max || 10,
         queueLimit: 0,
-        acquireTimeout: this.config.acquireTimeout,
-        timeout: this.config.connectionTimeout,
-        reconnect: true
+        connectTimeout: this.config.connectionTimeout || 60000,
+        enableKeepAlive: true,
+        keepAliveInitialDelay: 10000
       };
 
       // Add SSL configuration if enabled

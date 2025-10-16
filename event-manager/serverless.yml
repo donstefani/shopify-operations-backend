@@ -13,6 +13,9 @@ provider:
     SHOPIFY_API_VERSION: ${env:SHOPIFY_API_VERSION}
     SHOPIFY_WEBHOOK_SECRET: ${env:SHOPIFY_WEBHOOK_SECRET}
     
+    # Auth Service Configuration
+    AUTH_SERVICE_URL: ${env:AUTH_SERVICE_URL, 'https://s0avdp4219.execute-api.us-east-1.amazonaws.com/dev'}
+    
     # Database Configuration
     DB_HOST: ${env:DB_HOST}
     DB_PORT: ${env:DB_PORT}
@@ -59,6 +62,8 @@ package:
 functions:
   webhook-processor:
     handler: handler.handler
+    timeout: 30  # Increase timeout to 30 seconds for database and API calls
+    memorySize: 512  # Reduce memory to save costs (event processing doesn't need 1GB)
     events:
       - http:
           path: /{proxy+}

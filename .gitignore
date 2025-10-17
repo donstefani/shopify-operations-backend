@@ -376,3 +376,5 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+.env.example
+event-manager/.env.example

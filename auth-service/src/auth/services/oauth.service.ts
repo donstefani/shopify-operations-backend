@@ -31,7 +31,7 @@ export class OAuthService {
       clientId: process.env.SHOPIFY_CLIENT_ID,
       clientSecret: process.env.SHOPIFY_CLIENT_SECRET,
       redirectUri: process.env.SHOPIFY_REDIRECT_URI,
-      scopes: (process.env.SHOPIFY_SCOPES || 'read_products,write_products').split(',').map(s => s.trim()),
+      scopes: (process.env.SHOPIFY_SCOPES || 'read_products,write_products,read_orders,read_customers').split(',').map(s => s.trim()),
       apiVersion: process.env.SHOPIFY_API_VERSION || '2025-07'
     };
   }

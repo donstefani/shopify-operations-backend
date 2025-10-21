@@ -31,8 +31,8 @@ export class OrderClient extends BaseGraphQLClient {
           totalShippingPrice
           totalDiscounts
           currencyCode
-          financialStatus
-          fulfillmentStatus
+          displayFinancialStatus
+          displayFulfillmentStatus
           tags
           note
           customerLocale
@@ -42,7 +42,9 @@ export class OrderClient extends BaseGraphQLClient {
             firstName
             lastName
             phone
-            acceptsMarketing
+            emailMarketingConsent {
+              marketingState
+            }
             createdAt
             updatedAt
           }
@@ -75,9 +77,18 @@ export class OrderClient extends BaseGraphQLClient {
               id
               title
               quantity
-              price
-              originalPrice
-              discountedPrice
+              originalUnitPriceSet {
+                shopMoney {
+                  amount
+                  currencyCode
+                }
+              }
+              discountedUnitPriceSet {
+                shopMoney {
+                  amount
+                  currencyCode
+                }
+              }
               variant {
                 id
                 title
@@ -95,8 +106,10 @@ export class OrderClient extends BaseGraphQLClient {
           fulfillments {
             id
             status
-            trackingCompany
-            trackingNumbers
+            trackingInfo {
+              company
+              number
+            }
             createdAt
             updatedAt
             fulfillmentLineItems(first: 100) {
@@ -119,8 +132,12 @@ export class OrderClient extends BaseGraphQLClient {
             id
             kind
             status
-            amount
-            currency
+            amountSet {
+              shopMoney {
+                amount
+                currencyCode
+              }
+            }
             gateway
             createdAt
             processedAt
@@ -159,8 +176,8 @@ export class OrderClient extends BaseGraphQLClient {
             processedAt
             totalPrice
             currencyCode
-            financialStatus
-            fulfillmentStatus
+            displayFinancialStatus
+            displayFulfillmentStatus
             tags
             customer {
               id
@@ -252,8 +269,10 @@ export class OrderClient extends BaseGraphQLClient {
           fulfillments {
             id
             status
-            trackingCompany
-            trackingNumbers
+            trackingInfo {
+              company
+              number
+            }
             createdAt
             updatedAt
             fulfillmentLineItems(first: 100) {
@@ -300,8 +319,12 @@ export class OrderClient extends BaseGraphQLClient {
             id
             kind
             status
-            amount
-            currency
+            amountSet {
+              shopMoney {
+                amount
+                currencyCode
+              }
+            }
             gateway
             createdAt
             processedAt
@@ -339,8 +362,8 @@ export class OrderClient extends BaseGraphQLClient {
             updatedAt
             totalPrice
             currencyCode
-            financialStatus
-            fulfillmentStatus
+            displayFinancialStatus
+            displayFulfillmentStatus
             customer {
               id
               email

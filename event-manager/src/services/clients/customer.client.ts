@@ -21,8 +21,10 @@ export class CustomerClient extends BaseGraphQLClient {
           firstName
           lastName
           phone
-          acceptsMarketing
-          acceptsMarketingUpdatedAt
+          emailMarketingConsent {
+            marketingState
+            consentUpdatedAt
+          }
           createdAt
           updatedAt
           defaultAddress {
@@ -39,19 +41,17 @@ export class CustomerClient extends BaseGraphQLClient {
             phone
           }
           addresses(first: 50) {
-            nodes {
-              id
-              firstName
-              lastName
-              company
-              address1
-              address2
-              city
-              province
-              country
-              zip
-              phone
-            }
+            id
+            firstName
+            lastName
+            company
+            address1
+            address2
+            city
+            province
+            country
+            zip
+            phone
           }
           metafields(first: 50) {
             nodes {
@@ -70,8 +70,11 @@ export class CustomerClient extends BaseGraphQLClient {
           multipassIdentifier
           taxExempt
           taxExemptions
-          totalSpent
-          ordersCount
+          amountSpent {
+            amount
+            currencyCode
+          }
+          numberOfOrders
         }
       }
     `;
@@ -102,11 +105,16 @@ export class CustomerClient extends BaseGraphQLClient {
             firstName
             lastName
             phone
-            acceptsMarketing
+            emailMarketingConsent {
+              marketingState
+            }
             createdAt
             updatedAt
-            totalSpent
-            ordersCount
+            amountSpent {
+              amount
+              currencyCode
+            }
+            numberOfOrders
             tags
             state
             verifiedEmail
@@ -218,8 +226,11 @@ export class CustomerClient extends BaseGraphQLClient {
       query getCustomerOrdersSummary($customerId: ID!) {
         customer(id: $customerId) {
           id
-          totalSpent
-          ordersCount
+          amountSpent {
+            amount
+            currencyCode
+          }
+          numberOfOrders
           orders(first: 10) {
             nodes {
               id
@@ -261,11 +272,16 @@ export class CustomerClient extends BaseGraphQLClient {
             firstName
             lastName
             phone
-            acceptsMarketing
+            emailMarketingConsent {
+              marketingState
+            }
             createdAt
             updatedAt
-            totalSpent
-            ordersCount
+            amountSpent {
+              amount
+              currencyCode
+            }
+            numberOfOrders
             tags
             state
             verifiedEmail
@@ -309,11 +325,16 @@ export class CustomerClient extends BaseGraphQLClient {
             firstName
             lastName
             phone
-            acceptsMarketing
+            emailMarketingConsent {
+              marketingState
+            }
             createdAt
             updatedAt
-            totalSpent
-            ordersCount
+            amountSpent {
+              amount
+              currencyCode
+            }
+            numberOfOrders
             tags
             state
             verifiedEmail
@@ -348,11 +369,16 @@ export class CustomerClient extends BaseGraphQLClient {
             firstName
             lastName
             phone
-            acceptsMarketing
+            emailMarketingConsent {
+              marketingState
+            }
             createdAt
             updatedAt
-            totalSpent
-            ordersCount
+            amountSpent {
+              amount
+              currencyCode
+            }
+            numberOfOrders
             tags
             state
             verifiedEmail

@@ -44,12 +44,31 @@ Process webhook events and forward them to other systems:
 ## Features
 
 - **Webhook Processing**: Handles Shopify webhook events for products, orders, customers, and app events
+- **GraphQL API Integration**: Uses Shopify's GraphQL Admin API (REST APIs are deprecated as of 2024-04)
 - **HMAC Verification**: Secure webhook verification using Shopify's HMAC signatures
 - **Event Logging**: Structured logging for all webhook events
 - **Webhook Management**: API endpoints to register, list, and manage webhooks
 - **DynamoDB Integration**: Retrieves encrypted access tokens from the auth service
 - **Serverless Ready**: Deploy to AWS Lambda with Serverless Framework
 - **TypeScript**: Full TypeScript support with strict type checking
+
+## ⚠️ Important: API Migration Notice
+
+**REST Admin API Deprecation (as of 2024-04):**
+
+The REST Admin API `/products` and `/variants` endpoints have been marked as deprecated across all API versions. This service uses the **GraphQL Admin API exclusively** for all product, order, and customer operations to ensure:
+
+- ✅ Full compliance with Shopify's API guidelines
+- ✅ Future-proof implementation (REST deadline: 2025-04-01)
+- ✅ Maintained App Store ranking (non-migrated apps will be demoted)
+- ✅ Better performance and flexibility with GraphQL queries
+
+**What we use:**
+- `ProductClient` - GraphQL queries for product data
+- `OrderClient` - GraphQL queries for order data  
+- `CustomerClient` - GraphQL queries for customer data
+
+**Migration status:** ✅ **Fully migrated** - No REST API dependencies
 
 ## Supported Webhook Topics
 
@@ -318,6 +337,89 @@ Then test with curl:
 curl -X POST "http://localhost:3001/webhooks/products/create" \
   -H "Content-Type: application/json" \
   -d '{"id": 123, "title": "Test Product", "handle": "test-product"}'
+```
+
+### Testing with Synthetic Data
+
+The project includes automated webhook tests (`test/test-webhooks.js`) that send synthetic webhook payloads to your deployed endpoints. These tests verify:
+
+✅ **What Works with Synthetic Data:**
+- Webhook routing and endpoint accessibility
+- Authentication token retrieval from DynamoDB
+- Webhook event logging
+- Error handling and recovery
+- Direct DynamoDB operations (like `customers/update`)
+
+⚠️ **Expected Behavior with Synthetic Data:**
+- Tests using **fake IDs** (products, orders, customers that don't exist in Shopify) will show "data sync failed"
+- This is **expected and correct** - the webhook handlers attempt to fetch full data from Shopify's GraphQL API
+- When Shopify returns null (resource doesn't exist), the handler logs the event but reports sync failure
+- The error messages show `graphqlError: undefined` because Shopify simply returns no data for non-existent IDs
+
+**To see full end-to-end sync working, you need to test with real Shopify webhooks (see below).**
+
+### Testing with Real Shopify Webhooks (Recommended)
+
+For complete integration testing, configure real webhooks from your Shopify store:
+
+#### Quick Test with Real Data:
+
+1. **Run the test suite to verify infrastructure:**
+   ```bash
+   node test/test-webhooks.js
+   ```
+   All endpoints should return 200 OK (even if sync fails with fake IDs)
+
+2. **Create a test product in Shopify Admin:**
+   - Go to your store: `don-stefani-demo-store.myshopify.com/admin`
+   - Create a new product (any product will work)
+
+3. **Configure the webhook in Shopify:**
+   - Go to Settings → Notifications → Webhooks
+   - Create webhook:
+     - Event: `Product creation`
+     - Format: `JSON`
+     - URL: `https://q1o3ju0dpk.execute-api.us-east-1.amazonaws.com/dev/webhooks/products/create`
+     - API version: `2025-07`
+
+4. **Update the product** to trigger the webhook
+   - The webhook will contain a **real product ID**
+   - Your handler will fetch full data from Shopify GraphQL API
+   - Data will sync successfully to DynamoDB ✅
+
+5. **Verify in DynamoDB:**
+   - Check the `operations-event-manager-products-dev` table
+   - You should see the product data with all fields populated
+
+#### Programmatic Webhook Registration (Alternative):
+
+You can also register webhooks programmatically using the management API:
+
+```bash
+curl -X POST "https://q1o3ju0dpk.execute-api.us-east-1.amazonaws.com/dev/api/webhooks/register" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "shop": "don-stefani-demo-store.myshopify.com",
+    "topic": "products/create",
+    "address": "https://q1o3ju0dpk.execute-api.us-east-1.amazonaws.com/dev/webhooks/products/create",
+    "format": "json"
+  }'
+```
+
+### Available Test Scripts:
+
+```bash
+# Test all webhook endpoints (uses synthetic data)
+node test/test-webhooks.js
+
+# Check OAuth token and scopes
+node test/check-token.js
+
+# View recent CloudWatch logs
+node test/view-logs.js
+
+# Delete OAuth token (for re-authentication)
+node test/delete-token.js
 ```
 
 ## Current Deployment

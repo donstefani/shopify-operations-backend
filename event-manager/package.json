@@ -28,11 +28,13 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@aws-sdk/client-cloudwatch-logs": "^3.913.0",
     "@aws-sdk/client-dynamodb": "^3.699.0",
     "@aws-sdk/lib-dynamodb": "^3.699.0",
     "@operations-manager/shared": "file:../shared",
     "@shopify/graphql-client": "^1.4.1",
     "@shopify/shopify-api": "^11.14.1",
+    "axios": "^1.12.2",
     "express": "^5.1.0",
     "graphql": "^16.8.1",
     "helmet": "^7.1.0",

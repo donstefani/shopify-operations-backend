@@ -10,7 +10,6 @@ const app = require('./dist/app');
 // Get the Express app (exported as default)
 const expressApp = app.default;
 
-// Wrap Express app with serverless-http
 module.exports.handler = serverless(expressApp, {
   // Handle binary content types
   binary: ['image/*', 'application/pdf'],

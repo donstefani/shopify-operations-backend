@@ -1,0 +1,10 @@
+/**
+ * DynamoDB Services
+ * 
+ * Export all DynamoDB service instances
+ */
+
+export { ProductDynamoDBService, type ShopifyProduct } from './product.service';
+export { OrderDynamoDBService, type ShopifyOrder } from './order.service';
+export { CustomerDynamoDBService, type ShopifyCustomer } from './customer.service';
+

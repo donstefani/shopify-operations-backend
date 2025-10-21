@@ -16,13 +16,11 @@ provider:
     # Auth Service Configuration
     AUTH_SERVICE_URL: ${env:AUTH_SERVICE_URL, 'https://s0avdp4219.execute-api.us-east-1.amazonaws.com/dev'}
     
-    # Database Configuration
-    DB_HOST: ${env:DB_HOST}
-    DB_PORT: ${env:DB_PORT}
-    DB_NAME: ${env:DB_NAME}
-    DB_USERNAME: ${env:DB_USERNAME}
-    DB_PASSWORD: ${env:DB_PASSWORD}
-    DB_SSL: ${env:DB_SSL}
+    # DynamoDB Table Names
+    PRODUCTS_TABLE_NAME: ${self:service}-products-${sls:stage}
+    ORDERS_TABLE_NAME: ${self:service}-orders-${sls:stage}
+    CUSTOMERS_TABLE_NAME: ${self:service}-customers-${sls:stage}
+    WEBHOOK_EVENTS_TABLE_NAME: ${self:service}-webhook-events-${sls:stage}
     
     # AWS Configuration
     NODE_ENV: ${env:NODE_ENV}
@@ -32,6 +30,7 @@ provider:
   iam:
     role:
       statements:
+        # Auth service DynamoDB table access
         - Effect: Allow
           Action:
             - dynamodb:GetItem
@@ -41,6 +40,26 @@ provider:
             - dynamodb:Scan
           Resource: 
             - "arn:aws:dynamodb:us-east-1:767398030559:table/portfolio-shopify-auth"
+        
+        # Event-manager DynamoDB tables access
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:Query
+            - dynamodb:Scan
+          Resource:
+            - !GetAtt ProductsTable.Arn
+            - !GetAtt OrdersTable.Arn
+            - !GetAtt CustomersTable.Arn
+            - !GetAtt WebhookEventsTable.Arn
+            # GSI access
+            - !Sub "${ProductsTable.Arn}/index/*"
+            - !Sub "${OrdersTable.Arn}/index/*"
+            - !Sub "${CustomersTable.Arn}/index/*"
+            - !Sub "${WebhookEventsTable.Arn}/index/*"
 
 plugins:
   - serverless-offline
@@ -62,8 +81,8 @@ package:
 functions:
   webhook-processor:
     handler: handler.handler
-    timeout: 30  # Increase timeout to 30 seconds for database and API calls
-    memorySize: 512  # Reduce memory to save costs (event processing doesn't need 1GB)
+    timeout: 30 
+    memorySize: 512 
     events:
       - http:
           path: /{proxy+}
@@ -91,3 +110,183 @@ custom:
 
 # Note: Using DynamoDB table 'portfolio-shopify-auth' 
 # created by the shopify-auth-service deployment
+
+# CloudFormation Resources
+resources:
+  Resources:
+    # Products Table
+    ProductsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-products-${sls:stage}
+        BillingMode: PAY_PER_REQUEST  # On-demand pricing for cost efficiency
+        AttributeDefinitions:
+          - AttributeName: shop_product_id
+            AttributeType: S
+          - AttributeName: shop_domain
+            AttributeType: S
+          - AttributeName: created_at
+            AttributeType: S
+        KeySchema:
+          - AttributeName: shop_product_id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: shop_domain-created_at-index
+            KeySchema:
+              - AttributeName: shop_domain
+                KeyType: HASH
+              - AttributeName: created_at
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+        Tags:
+          - Key: Service
+            Value: operations-event-manager
+          - Key: Stage
+            Value: ${sls:stage}
+    
+    # Orders Table
+    OrdersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-orders-${sls:stage}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: shop_order_id
+            AttributeType: S
+          - AttributeName: shop_domain
+            AttributeType: S
+          - AttributeName: email
+            AttributeType: S
+          - AttributeName: created_at
+            AttributeType: S
+        KeySchema:
+          - AttributeName: shop_order_id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: shop_domain-created_at-index
+            KeySchema:
+              - AttributeName: shop_domain
+                KeyType: HASH
+              - AttributeName: created_at
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: email-created_at-index
+            KeySchema:
+              - AttributeName: email
+                KeyType: HASH
+              - AttributeName: created_at
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+        Tags:
+          - Key: Service
+            Value: operations-event-manager
+          - Key: Stage
+            Value: ${sls:stage}
+    
+    # Customers Table
+    CustomersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-customers-${sls:stage}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: shop_customer_id
+            AttributeType: S
+          - AttributeName: shop_domain
+            AttributeType: S
+          - AttributeName: email
+            AttributeType: S
+          - AttributeName: created_at
+            AttributeType: S
+        KeySchema:
+          - AttributeName: shop_customer_id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: shop_domain-created_at-index
+            KeySchema:
+              - AttributeName: shop_domain
+                KeyType: HASH
+              - AttributeName: created_at
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: email-index
+            KeySchema:
+              - AttributeName: email
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+        Tags:
+          - Key: Service
+            Value: operations-event-manager
+          - Key: Stage
+            Value: ${sls:stage}
+    
+    # Webhook Events Table (for logging all webhook events)
+    WebhookEventsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-webhook-events-${sls:stage}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: event_id
+            AttributeType: S
+          - AttributeName: shop_domain
+            AttributeType: S
+          - AttributeName: created_at
+            AttributeType: S
+          - AttributeName: topic
+            AttributeType: S
+        KeySchema:
+          - AttributeName: event_id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: shop_domain-created_at-index
+            KeySchema:
+              - AttributeName: shop_domain
+                KeyType: HASH
+              - AttributeName: created_at
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: topic-created_at-index
+            KeySchema:
+              - AttributeName: topic
+                KeyType: HASH
+              - AttributeName: created_at
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+        Tags:
+          - Key: Service
+            Value: operations-event-manager
+          - Key: Stage
+            Value: ${sls:stage}
+  
+  Outputs:
+    ProductsTableName:
+      Description: DynamoDB Products Table Name
+      Value: !Ref ProductsTable
+    OrdersTableName:
+      Description: DynamoDB Orders Table Name
+      Value: !Ref OrdersTable
+    CustomersTableName:
+      Description: DynamoDB Customers Table Name
+      Value: !Ref CustomersTable
+    WebhookEventsTableName:
+      Description: DynamoDB Webhook Events Table Name
+      Value: !Ref WebhookEventsTable

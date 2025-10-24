@@ -1,0 +1,62 @@
+service: customer-manager
+
+provider:
+  name: aws
+  runtime: nodejs22.x
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  httpApi:
+    cors:
+      allowedOrigins:
+        - http://localhost:5173
+        - http://localhost:3000
+      allowedHeaders:
+        - Content-Type
+        - Authorization
+        - Apollo-Require-Preflight
+      allowedMethods:
+        - GET
+        - POST
+        - OPTIONS
+  environment:
+    DYNAMODB_TABLE: operations-event-manager-customers-${self:provider.stage}
+    AUTH_TABLE: portfolio-shopify-auth
+    SHOP_DOMAIN: don-stefani-demo-store.myshopify.com
+    NODE_ENV: ${self:provider.stage}
+    SHOPIFY_API_KEY: ${ssm:/shopify-customers/SHOPIFY_CLIENT_ID}
+    SHOPIFY_API_SECRET: ${ssm:/shopify-customers/SHOPIFY_CLIENT_SECRET}
+    ENCRYPTION_KEY: ${ssm:/shopify-customers/ENCRYPTION_KEY}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.DYNAMODB_TABLE}
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.DYNAMODB_TABLE}/index/*
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.AUTH_TABLE}
+        - Effect: Allow
+          Action:
+            - ssm:GetParameter
+          Resource:
+            - arn:aws:ssm:${self:provider.region}:*:parameter/shopify-customers/*
+
+functions:
+  graphql:
+    handler: dist/handler.handler
+    timeout: 30
+    memorySize: 512
+    events:
+      - httpApi:
+          path: /graphql
+          method: ANY
+
+plugins:
+  - serverless-offline
+

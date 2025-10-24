@@ -18,18 +18,36 @@ export interface ShopifyOrder {
   total_price: string;
   subtotal_price?: string;
   total_tax?: string;
+  total_discounts?: string;
+  total_line_items_price?: string;
+  current_total_price?: string;
+  current_total_tax?: string;
   currency: string;
+  presentment_currency?: string;
   financial_status: string;
   fulfillment_status?: string;
+  processing_method?: string;
+  gateway?: string;
+  source_name?: string;
   line_items: any[];
+  shipping_lines?: any[];
+  discount_codes?: any[];
   customer_data?: any;
+  customer_id?: string | undefined;  // Reference to customer table
   shipping_address?: any;
   billing_address?: any;
   note?: string;
   tags?: string[];
+  buyer_accepts_marketing?: boolean;
+  confirmed?: boolean;
+  taxes_included?: boolean;
+  test?: boolean;
   created_at: string;
   updated_at: string;
   processed_at?: string;
+  closed_at?: string;
+  cancelled_at?: string;
+  cancel_reason?: string;
 }
 
 export class OrderDynamoDBService {

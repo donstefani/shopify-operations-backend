@@ -62,18 +62,22 @@ export interface OrderStats {
 }
 
 export interface DynamoDBOrder {
+  shop_order_id: string; // Primary key
   shop_domain: string;
-  order_id: string;
-  shopify_id: string;
-  order_number: string;
+  shopify_order_id: string; // Shopify order ID (from event-manager)
+  shopify_id?: string; // Alternative field name
+  order_name: string; // Order name like "#1001" (from event-manager)
+  order_number?: string; // Alternative field name
+  order_id?: string; // Alternative field name
   customer_id?: string;
   customer_email?: string;
-  total_price: number;
+  email?: string; // Alternative field name (from event-manager)
+  total_price: number | string; // Can be string from event-manager
   currency: string;
-  status: string;
+  status?: string;
   fulfillment_status?: string;
-  financial_status?: string;
-  sync_status: string;
+  financial_status: string; // From event-manager
+  sync_status?: string;
   created_at: string;
   updated_at: string;
 }

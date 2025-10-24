@@ -69,18 +69,27 @@ export interface CustomerStats {
 }
 
 export interface DynamoDBCustomer {
+  shop_customer_id: string; // Primary key
   shop_domain: string;
-  customer_id: string;
-  shopify_id: string;
+  shopify_customer_id: string; // Shopify customer ID
   email: string;
   first_name?: string;
   last_name?: string;
   phone?: string;
-  total_spent: number;
-  orders_count: number;
+  total_spent: number | string; // Can be string from event-manager
+  orders_count: number | string; // Can be string from event-manager
   state: string;
-  sync_status: string;
+  sync_status?: string;
   created_at: string;
   updated_at: string;
+  // Additional fields that might be present
+  accepts_marketing?: boolean;
+  verified_email?: boolean;
+  tax_exempt?: boolean;
+  marketing_opt_in_level?: string;
+  note?: string;
+  addresses?: any[];
+  default_address?: any;
+  tags?: any[];
 }
 

@@ -35,6 +35,7 @@
     "@shopify/graphql-client": "^1.4.1",
     "@shopify/shopify-api": "^11.14.1",
     "axios": "^1.12.2",
+    "cors": "^2.8.5",
     "express": "^5.1.0",
     "graphql": "^16.8.1",
     "helmet": "^7.1.0",
@@ -46,6 +47,7 @@
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.145",
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/jest": "^29.5.12",
     "@types/node": "^24.3.1",

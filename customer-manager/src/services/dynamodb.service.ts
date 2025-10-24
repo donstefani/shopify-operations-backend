@@ -24,17 +24,17 @@ export class DynamoDBService {
 
   private toDomainModel(item: DynamoDBCustomer): Customer {
     return {
-      id: item.customer_id,
-      shopifyId: item.shopify_id,
+      id: item.shop_customer_id, // Use the primary key as the ID
+      shopifyId: item.shopify_customer_id, // Use the correct field name
       shopDomain: item.shop_domain,
       email: item.email,
       firstName: item.first_name,
       lastName: item.last_name,
       phone: item.phone,
-      totalSpent: item.total_spent || 0,
-      ordersCount: item.orders_count || 0,
-      state: item.state as CustomerState,
-      syncStatus: item.sync_status as SyncStatus,
+      totalSpent: typeof item.total_spent === 'string' ? parseFloat(item.total_spent) : (item.total_spent || 0),
+      ordersCount: typeof item.orders_count === 'string' ? parseInt(item.orders_count) : (item.orders_count || 0),
+      state: (item.state?.toUpperCase() as CustomerState) || CustomerState.DISABLED,
+      syncStatus: (item.sync_status as SyncStatus) || SyncStatus.SYNCED, // Default to SYNCED if not specified
       createdAt: item.created_at,
       updatedAt: item.updated_at,
     };
@@ -42,9 +42,9 @@ export class DynamoDBService {
 
   private toDBModel(customer: Partial<Customer>): Partial<DynamoDBCustomer> {
     const dbItem: Partial<DynamoDBCustomer> = {
+      shop_customer_id: `${customer.shopDomain}#${customer.shopifyId}`, // Generate composite primary key
       shop_domain: customer.shopDomain,
-      customer_id: customer.id,
-      shopify_id: customer.shopifyId,
+      shopify_customer_id: customer.shopifyId,
       email: customer.email,
       first_name: customer.firstName,
       last_name: customer.lastName,
@@ -76,16 +76,20 @@ export class DynamoDBService {
   }
 
   async getCustomer(shopDomain: string, shopifyId: string): Promise<Customer | null> {
-    const result = await this.client.send(new GetCommand({
+    // Use the GSI to find the customer by shop_domain and shopify_id
+    const result = await this.client.send(new QueryCommand({
       TableName: this.tableName,
-      Key: {
-        shop_domain: shopDomain,
-        customer_id: `CUSTOMER#${shopifyId}`,
+      IndexName: 'shop_domain-created_at-index',
+      KeyConditionExpression: 'shop_domain = :shop_domain',
+      FilterExpression: 'shopify_customer_id = :shopify_id',
+      ExpressionAttributeValues: {
+        ':shop_domain': shopDomain,
+        ':shopify_id': shopifyId,
       },
     }));
 
-    if (!result.Item) return null;
-    return this.toDomainModel(result.Item as DynamoDBCustomer);
+    if (!result.Items || result.Items.length === 0) return null;
+    return this.toDomainModel(result.Items[0] as DynamoDBCustomer);
   }
 
   async listCustomers(
@@ -96,6 +100,7 @@ export class DynamoDBService {
   ): Promise<{ items: Customer[]; lastEvaluatedKey?: Record<string, any>; count: number }> {
     const params: any = {
       TableName: this.tableName,
+      IndexName: 'shop_domain-created_at-index', // Use the GSI to query by shop_domain
       KeyConditionExpression: 'shop_domain = :shop_domain',
       ExpressionAttributeValues: {
         ':shop_domain': shopDomain,

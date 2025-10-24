@@ -1,6 +1,5 @@
 import { WebhookRequest, WebhookHandlerResult, WEBHOOK_TOPICS } from '../types/index';
 import { BaseWebhookHandler } from './base.handler';
-import { orderClient } from '../../services/clients/index';
 import { errorHandlingService } from '../../services/core/index';
 
 /**
@@ -52,6 +51,62 @@ export class OrderWebhookHandler extends BaseWebhookHandler {
       };
     }
   }
+
+  /**
+   * Handle customer relationship for orders
+   * Checks if customer exists, creates if not, returns customer ID
+   */
+  private async handleCustomerRelationship(customerData: any, shop: string): Promise<string | undefined> {
+    if (!customerData || !customerData.id) {
+      return undefined;
+    }
+
+    try {
+      // Check if customer already exists
+      const existingCustomer = await this.customerService.getCustomer(shop, customerData.id.toString());
+      
+      if (existingCustomer.success && existingCustomer.data) {
+        console.log(`👤 Customer already exists: ${customerData.id} (${customerData.email})`);
+        return existingCustomer.data.shop_customer_id;
+      }
+
+      // Customer doesn't exist, create it
+      console.log(`👤 Creating new customer from order: ${customerData.id} (${customerData.email})`);
+      
+      const saveResult = await this.customerService.saveCustomer({
+        shop_domain: shop,
+        shopify_customer_id: customerData.id.toString(),
+        email: customerData.email || '',
+        first_name: customerData.first_name || '',
+        last_name: customerData.last_name || '',
+        phone: customerData.phone || '',
+        addresses: customerData.addresses || [],
+        default_address: customerData.default_address || {},
+        total_spent: customerData.total_spent || '0',
+        orders_count: customerData.orders_count || 0,
+        state: customerData.state || 'DISABLED',
+        verified_email: customerData.verified_email || false,
+        tax_exempt: customerData.tax_exempt || false,
+        tags: Array.isArray(customerData.tags) ? customerData.tags : (customerData.tags ? customerData.tags.split(', ') : []),
+        note: customerData.note || '',
+        accepts_marketing: customerData.accepts_marketing || false,
+        marketing_opt_in_level: customerData.marketing_opt_in_level || 'UNKNOWN',
+        created_at: customerData.created_at || new Date().toISOString(),
+        updated_at: customerData.updated_at || new Date().toISOString()
+      });
+
+      if (saveResult.success && saveResult.data) {
+        console.log(`✅ Customer created from order: ${saveResult.data.shop_customer_id}`);
+        return saveResult.data.shop_customer_id;
+      } else {
+        console.warn(`⚠️  Failed to create customer from order: ${saveResult.message}`);
+        return undefined;
+      }
+    } catch (error) {
+      console.error('❌ Error handling customer relationship:', error);
+      return undefined;
+    }
+  }
   
   private async handleOrderCreate(data: any, shop: string): Promise<WebhookHandlerResult> {
     console.log(`Order created in shop ${shop}:`, {
@@ -63,107 +118,103 @@ export class OrderWebhookHandler extends BaseWebhookHandler {
     });
     
     try {
-      // Get access token for the shop
-      const accessToken = await this.getAccessToken(shop);
-      if (!accessToken) {
-        // Log webhook but skip Shopify API call if no token
+      // Handle customer relationship first
+      let customerId: string | undefined;
+      if (data.customer && data.customer.id) {
+        customerId = await this.handleCustomerRelationship(data.customer, shop);
+      }
+
+      // Save order data directly from webhook payload (webhook contains all needed data)
+      // Note: GraphQL API access to orders is restricted due to protected customer data
+      const saveResult = await this.orderService.saveOrder({
+          shop_domain: shop,
+          shopify_order_id: data.id.toString(),
+          order_name: data.name || `#${data.order_number}`,
+          order_number: data.order_number,
+          email: data.email || data.contact_email || '',
+          phone: data.phone || '',
+          total_price: data.total_price || '0',
+          subtotal_price: data.subtotal_price || '0',
+          total_tax: data.total_tax || '0',
+          total_discounts: data.total_discounts || '0',
+          total_line_items_price: data.total_line_items_price || '0',
+          current_total_price: data.current_total_price || data.total_price || '0',
+          current_total_tax: data.current_total_tax || data.total_tax || '0',
+          currency: data.currency || 'USD',
+          presentment_currency: data.presentment_currency || data.currency || 'USD',
+          financial_status: data.financial_status || 'PENDING',
+          fulfillment_status: data.fulfillment_status || 'UNFULFILLED',
+          processing_method: data.processing_method || '',
+          gateway: data.gateway || '',
+          source_name: data.source_name || 'web',
+          line_items: data.line_items || [],
+          shipping_lines: data.shipping_lines || [],
+          discount_codes: data.discount_codes || [],
+          customer_data: data.customer || {},
+          customer_id: customerId,
+          shipping_address: data.shipping_address || {},
+          billing_address: data.billing_address || {},
+          note: data.note || '',
+          tags: Array.isArray(data.tags) ? data.tags : (data.tags ? data.tags.split(', ') : []),
+          buyer_accepts_marketing: data.buyer_accepts_marketing || false,
+          confirmed: data.confirmed || false,
+          taxes_included: data.taxes_included || false,
+          test: data.test || false,
+          created_at: data.created_at || new Date().toISOString(),
+          updated_at: data.updated_at || new Date().toISOString(),
+          processed_at: data.processed_at || new Date().toISOString(),
+          closed_at: data.closed_at || null,
+          cancelled_at: data.cancelled_at || null,
+          cancel_reason: data.cancel_reason || null
+        });
+
+        // Update customer spending information if customer exists
+        console.log('🔍 Checking customer spending update conditions:', {
+          customerId,
+          hasCustomerData: !!data.customer,
+          customerIdFromData: data.customer?.id
+        });
+        
+        if (customerId && data.customer && data.customer.id) {
+          try {
+            // Calculate new total spent and orders count
+            const orderTotal = parseFloat(data.total_price || '0');
+            
+            // Get current customer data to calculate new totals
+            const customerResult = await this.customerService.getCustomer(shop, data.customer.id.toString());
+            if (customerResult.success && customerResult.data) {
+              const currentCustomer = customerResult.data;
+              const currentTotalSpent = parseFloat(currentCustomer.total_spent || '0');
+              const currentOrdersCount = currentCustomer.orders_count || 0;
+              
+              const newTotalSpent = (currentTotalSpent + orderTotal).toString();
+              const newOrdersCount = currentOrdersCount + 1;
+              
+              await this.customerService.updateCustomerSpending(
+                shop,
+                data.customer.id.toString(),
+                newTotalSpent,
+                newOrdersCount
+              );
+              
+              console.log('💰 Updated customer spending:', {
+                customerId: data.customer.id,
+                orderTotal,
+                newTotalSpent,
+                newOrdersCount
+              });
+            }
+          } catch (error) {
+            console.error('❌ Failed to update customer spending:', error);
+            // Don't fail the order processing if customer update fails
+          }
+        }
+
         return {
           success: true,
-          message: 'Order creation webhook logged (Shopify API sync skipped - no access token)',
-          data: { orderId: data.id, action: 'created', synchronized: false, reason: 'no_token' }
+          message: 'Order creation webhook processed and data saved to DynamoDB (from webhook payload)',
+          data: { orderId: data.id, action: 'created', synchronized: true, saved: saveResult.success, customerId }
         };
-      }
-
-      // Fetch full order data using GraphQL client
-      const result = await orderClient.getOrder(
-        `gid://shopify/Order/${data.id}`,
-        {
-          shopDomain: shop,
-          operation: 'getOrder',
-          requestId: `webhook-${Date.now()}`,
-          additionalData: { webhookEvent: 'order_create' }
-        },
-        {
-          shopDomain: shop,
-          accessToken: accessToken,
-          apiVersion: process.env['SHOPIFY_API_VERSION'] || '2024-01'
-        }
-      );
-
-      if (result.success && result.data) {
-        const orderData = (result.data.data as any)?.order;
-        if (orderData) {
-          // Extract order ID from GID
-          const orderId = orderData.id.replace('gid://shopify/Order/', '');
-          
-          // Save order data to DynamoDB
-          const saveResult = await this.orderService.saveOrder({
-            shop_domain: shop,
-            shopify_order_id: orderId,
-            order_name: orderData.name,
-            order_number: orderData.orderNumber,
-            email: orderData.email || '',
-            phone: orderData.phone || '',
-            total_price: orderData.totalPriceSet?.shopMoney?.amount || orderData.totalPrice || '0',
-            subtotal_price: orderData.subtotalPriceSet?.shopMoney?.amount || '0',
-            total_tax: orderData.totalTaxSet?.shopMoney?.amount || '0',
-            currency: orderData.currencyCode || 'USD',
-            financial_status: orderData.displayFinancialStatus || 'PENDING',
-            fulfillment_status: orderData.displayFulfillmentStatus || 'UNFULFILLED',
-            line_items: orderData.lineItems?.nodes || [],
-            customer_data: orderData.customer || {},
-            shipping_address: orderData.shippingAddress || {},
-            billing_address: orderData.billingAddress || {},
-            note: orderData.note || '',
-            tags: orderData.tags || [],
-            created_at: orderData.createdAt || new Date().toISOString(),
-            updated_at: orderData.updatedAt || new Date().toISOString(),
-            processed_at: orderData.processedAt || new Date().toISOString()
-          });
-
-          console.log('🛒 Order data synchronized to DynamoDB:', {
-            orderId: orderId,
-            orderName: orderData.name,
-            totalPrice: orderData.totalPrice,
-            currency: orderData.currencyCode,
-            lineItemsCount: orderData.lineItems?.nodes?.length || 0,
-            customerEmail: orderData.email,
-            saved: saveResult.success
-          });
-
-          return {
-            success: true,
-            message: 'Order creation webhook processed and data saved to DynamoDB',
-            data: { 
-              orderId: data.id, 
-              action: 'created',
-              synchronized: true,
-              saved: saveResult.success,
-              lineItemsCount: orderData.lineItems?.nodes?.length || 0,
-              totalPrice: orderData.totalPrice,
-              currency: orderData.currencyCode
-            }
-          };
-        }
-      }
-
-      // If GraphQL fetch failed, still log the webhook but report the issue
-      await errorHandlingService.handleWebhookError(
-        new Error(`Failed to fetch order data: ${result.error?.message || 'Unknown error'}`),
-        'orders/create',
-        shop,
-        {
-          service: 'order-webhook-handler',
-          operation: 'handleOrderCreate',
-          additionalData: { orderId: data.id, graphqlError: result.error?.message }
-        }
-      );
-
-      return {
-        success: true,
-        message: 'Order creation webhook processed (data sync failed)',
-        data: { orderId: data.id, action: 'created', synchronized: false }
-      };
     } catch (error) {
       await errorHandlingService.handleWebhookError(
         error,

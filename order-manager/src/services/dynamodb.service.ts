@@ -24,18 +24,18 @@ export class DynamoDBService {
 
   private toDomainModel(item: DynamoDBOrder): Order {
     return {
-      id: item.order_id,
-      shopifyId: item.shopify_id,
+      id: item.shop_order_id, // Use the primary key as the ID
+      shopifyId: item.shopify_id || item.shopify_order_id, // Handle both field names
       shopDomain: item.shop_domain,
-      orderNumber: item.order_number,
+      orderNumber: item.order_number || item.order_name, // Handle both field names
       customerId: item.customer_id,
-      customerEmail: item.customer_email,
-      totalPrice: item.total_price,
+      customerEmail: item.customer_email || item.email, // Handle both field names
+      totalPrice: typeof item.total_price === 'string' ? parseFloat(item.total_price) : item.total_price,
       currency: item.currency,
-      status: item.status,
+      status: item.status || item.financial_status, // Use financial_status as status if status is not available
       fulfillmentStatus: item.fulfillment_status,
       financialStatus: item.financial_status,
-      syncStatus: item.sync_status as SyncStatus,
+      syncStatus: (item.sync_status as SyncStatus) || SyncStatus.SYNCED, // Default to SYNCED if not specified
       createdAt: item.created_at,
       updatedAt: item.updated_at,
     };
@@ -43,6 +43,7 @@ export class DynamoDBService {
 
   private toDBModel(order: Partial<Order>): Partial<DynamoDBOrder> {
     const dbItem: Partial<DynamoDBOrder> = {
+      shop_order_id: `${order.shopDomain}#${order.shopifyId}`, // Composite primary key
       shop_domain: order.shopDomain,
       order_id: order.id,
       shopify_id: order.shopifyId,
@@ -78,16 +79,20 @@ export class DynamoDBService {
   }
 
   async getOrder(shopDomain: string, shopifyId: string): Promise<Order | null> {
-    const result = await this.client.send(new GetCommand({
+    // Use the GSI to find the order by shop_domain and shopify_id
+    const result = await this.client.send(new QueryCommand({
       TableName: this.tableName,
-      Key: {
-        shop_domain: shopDomain,
-        order_id: `ORDER#${shopifyId}`,
+      IndexName: 'shop_domain-created_at-index',
+      KeyConditionExpression: 'shop_domain = :shop_domain',
+      FilterExpression: 'shopify_id = :shopify_id',
+      ExpressionAttributeValues: {
+        ':shop_domain': shopDomain,
+        ':shopify_id': shopifyId,
       },
     }));
 
-    if (!result.Item) return null;
-    return this.toDomainModel(result.Item as DynamoDBOrder);
+    if (!result.Items || result.Items.length === 0) return null;
+    return this.toDomainModel(result.Items[0] as DynamoDBOrder);
   }
 
   async listOrders(
@@ -98,11 +103,13 @@ export class DynamoDBService {
   ): Promise<{ items: Order[]; lastEvaluatedKey?: Record<string, any>; count: number }> {
     const params: any = {
       TableName: this.tableName,
+      IndexName: 'shop_domain-created_at-index', // Use the GSI to query by shop_domain
       KeyConditionExpression: 'shop_domain = :shop_domain',
       ExpressionAttributeValues: {
         ':shop_domain': shopDomain,
       },
       Limit: limit,
+      ScanIndexForward: false, // Sort by created_at in descending order (newest first)
     };
 
     if (exclusiveStartKey) {
@@ -222,7 +229,12 @@ export class DynamoDBService {
     };
 
     items.forEach(item => {
-      stats.totalRevenue += item.total_price || 0;
+      // Convert total_price to number (it might be a string from event-manager)
+      const price = typeof item.total_price === 'string' 
+        ? parseFloat(item.total_price) 
+        : (item.total_price || 0);
+      stats.totalRevenue += price;
+      
       const finStatus = item.financial_status?.toLowerCase();
       if (finStatus === 'pending') stats.byStatus.pending++;
       else if (finStatus === 'paid') stats.byStatus.paid++;

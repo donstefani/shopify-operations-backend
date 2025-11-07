@@ -124,6 +124,7 @@ export class DynamoDBService {
   ): Promise<{ items: Product[]; lastEvaluatedKey?: Record<string, any>; count: number }> {
     const params: any = {
       TableName: this.tableName,
+      IndexName: 'shop_domain-created_at-index', // Use GSI to query by shop_domain
       KeyConditionExpression: 'shop_domain = :shop_domain',
       ExpressionAttributeValues: {
         ':shop_domain': shopDomain,

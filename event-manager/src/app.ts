@@ -15,13 +15,33 @@ errorHandlingService.initialize().catch(error => {
 
 // CORS middleware - allow requests from the UI
 app.use(cors({
-  origin: [
-    'http://localhost:5173', // Vite dev server
-    'http://localhost:3000', // Alternative dev port
-    'https://*.vercel.app', // Vercel deployments
-    'https://*.netlify.app', // Netlify deployments
-    process.env['UI_ORIGIN'] || 'http://localhost:5173'
-  ],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    // List of allowed origins
+    const allowedOrigins = [
+      'http://localhost:5173', // Vite dev server
+      'http://localhost:3000', // Alternative dev port
+      'https://donstefani.com', // Production site
+      process.env['UI_ORIGIN'] // Environment-specific origin
+    ].filter(Boolean); // Remove undefined values
+
+    // Check if origin matches any allowed origin
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      // Also allow vercel and netlify subdomains
+      if (origin.match(/^https:\/\/(.+\.)?vercel\.app$/) || 
+          origin.match(/^https:\/\/(.+\.)?netlify\.app$/)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']

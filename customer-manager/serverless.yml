@@ -10,6 +10,7 @@ provider:
       allowedOrigins:
         - http://localhost:5173
         - http://localhost:3000
+        - https://donstefani.com
       allowedHeaders:
         - Content-Type
         - Authorization

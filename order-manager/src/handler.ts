@@ -28,7 +28,7 @@ const apolloHandler = startServerAndCreateLambdaHandler(
   handlers.createAPIGatewayProxyEventV2RequestHandler()
 );
 
-// Custom handler that intercepts OPTIONS requests
+// Custom handler that intercepts OPTIONS requests and adds CORS headers to all responses
 export const handler = async (event: any, context: any) => {
   // Handle OPTIONS requests for CORS preflight
   if (event.requestContext?.http?.method === 'OPTIONS') {
@@ -44,7 +44,30 @@ export const handler = async (event: any, context: any) => {
     };
   }
 
-  // For all other requests, use the Apollo Server handler
-  return apolloHandler(event, context, () => {});
+  // For all other requests, use the Apollo Server handler and add CORS headers
+  const response = await apolloHandler(event, context, () => {});
+  
+  // Add CORS headers to the response
+  if (!response) {
+    return {
+      statusCode: 500,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, Apollo-Require-Preflight',
+      },
+      body: JSON.stringify({ error: 'Internal server error' }),
+    };
+  }
+  
+  return {
+    ...response,
+    headers: {
+      ...(response.headers || {}),
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, Apollo-Require-Preflight',
+    },
+  };
 };
 

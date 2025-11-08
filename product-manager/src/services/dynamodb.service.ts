@@ -6,7 +6,7 @@ import {
   QueryCommand,
   UpdateCommand,
   DeleteCommand,
-  ScanCommand,
+  QueryCommandInput,
 } from '@aws-sdk/lib-dynamodb';
 import { Product, DynamoDBProduct, ProductStatus, SyncStatus } from '../types';
 
@@ -116,13 +116,89 @@ export class DynamoDBService {
   /**
    * List products with pagination and filters
    */
+  private buildFilterExpressions(
+    filters?: { status?: ProductStatus; search?: string }
+  ): {
+    filterExpression?: string;
+    attributeNames: Record<string, string>;
+    attributeValues: Record<string, any>;
+  } {
+    const filterExpressions: string[] = [];
+    const attributeNames: Record<string, string> = {};
+    const attributeValues: Record<string, any> = {};
+
+    if (!filters) {
+      return { filterExpression: undefined, attributeNames, attributeValues };
+    }
+
+    if (filters.status) {
+      filterExpressions.push('#status = :status');
+      attributeNames['#status'] = 'status';
+      attributeValues[':status'] = filters.status;
+    }
+
+    if (filters.search) {
+      filterExpressions.push('(contains(#title, :search) OR contains(#handle, :search))');
+      attributeNames['#title'] = 'title';
+      attributeNames['#handle'] = 'handle';
+      attributeValues[':search'] = filters.search;
+    }
+
+    return {
+      filterExpression: filterExpressions.length > 0 ? filterExpressions.join(' AND ') : undefined,
+      attributeNames,
+      attributeValues,
+    };
+  }
+
+  private async getTotalProductCount(
+    shopDomain: string,
+    filters?: { status?: ProductStatus; search?: string }
+  ): Promise<number> {
+    let total = 0;
+    let exclusiveStartKey: Record<string, any> | undefined;
+
+    const { filterExpression, attributeNames, attributeValues } = this.buildFilterExpressions(filters);
+
+    do {
+      const params: QueryCommandInput = {
+        TableName: this.tableName,
+        IndexName: 'shop_domain-created_at-index',
+        KeyConditionExpression: 'shop_domain = :shop_domain',
+        ExpressionAttributeValues: {
+          ':shop_domain': shopDomain,
+          ...attributeValues,
+        },
+        Select: 'COUNT',
+      };
+
+      if (filterExpression) {
+        params.FilterExpression = filterExpression;
+      }
+
+      if (Object.keys(attributeNames).length > 0) {
+        params.ExpressionAttributeNames = attributeNames;
+      }
+
+      if (exclusiveStartKey) {
+        params.ExclusiveStartKey = exclusiveStartKey;
+      }
+
+      const result = await this.client.send(new QueryCommand(params));
+      total += result.Count ?? 0;
+      exclusiveStartKey = result.LastEvaluatedKey;
+    } while (exclusiveStartKey);
+
+    return total;
+  }
+
   async listProducts(
     shopDomain: string,
     limit: number = 20,
     exclusiveStartKey?: Record<string, any>,
     filters?: { status?: ProductStatus; search?: string }
-  ): Promise<{ items: Product[]; lastEvaluatedKey?: Record<string, any>; count: number }> {
-    const params: any = {
+  ): Promise<{ items: Product[]; lastEvaluatedKey?: Record<string, any>; totalCount: number }> {
+    const params: QueryCommandInput = {
       TableName: this.tableName,
       IndexName: 'shop_domain-created_at-index', // Use GSI to query by shop_domain
       KeyConditionExpression: 'shop_domain = :shop_domain',
@@ -136,42 +212,35 @@ export class DynamoDBService {
       params.ExclusiveStartKey = exclusiveStartKey;
     }
 
-    // Add filter expressions if provided
-    if (filters) {
-      const filterExpressions: string[] = [];
-      
-      if (filters.status) {
-        filterExpressions.push('#status = :status');
-        params.ExpressionAttributeValues[':status'] = filters.status;
-        params.ExpressionAttributeNames = {
-          ...params.ExpressionAttributeNames,
-          '#status': 'status',
-        };
-      }
+    const { filterExpression, attributeNames, attributeValues } = this.buildFilterExpressions(filters);
 
-      if (filters.search) {
-        filterExpressions.push('(contains(#title, :search) OR contains(#handle, :search))');
-        params.ExpressionAttributeValues[':search'] = filters.search;
-        params.ExpressionAttributeNames = {
-          ...params.ExpressionAttributeNames,
-          '#title': 'title',
-          '#handle': 'handle',
-        };
-      }
+    if (filterExpression) {
+      params.FilterExpression = filterExpression;
+    }
 
-      if (filterExpressions.length > 0) {
-        params.FilterExpression = filterExpressions.join(' AND ');
-      }
+    if (Object.keys(attributeNames).length > 0) {
+      params.ExpressionAttributeNames = {
+        ...(params.ExpressionAttributeNames ?? {}),
+        ...attributeNames,
+      };
+    }
+
+    if (Object.keys(attributeValues).length > 0) {
+      params.ExpressionAttributeValues = {
+        ...params.ExpressionAttributeValues,
+        ...attributeValues,
+      };
     }
 
     const result = await this.client.send(new QueryCommand(params));
 
     const items = (result.Items || []).map(item => this.toDomainModel(item as DynamoDBProduct));
+    const totalCount = await this.getTotalProductCount(shopDomain, filters);
 
     return {
       items,
       lastEvaluatedKey: result.LastEvaluatedKey,
-      count: result.Count || 0,
+      totalCount,
     };
   }
 

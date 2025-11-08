@@ -1,3 +1,5 @@
+import { jest } from '@jest/globals';
+
 /**
  * Jest Setup File for Event Manager Tests
  * 
@@ -10,12 +12,8 @@ process.env['NODE_ENV'] = 'test';
 // Mock environment variables for testing
 process.env['AWS_REGION'] = 'us-east-1';
 process.env['SHOPIFY_API_SECRET'] = 'test-secret';
-
-// Database configuration for tests
-process.env['DB_HOST'] = 'localhost';
-process.env['DB_USER'] = 'test_user';
-process.env['DB_PASSWORD'] = 'test_password';
-process.env['DB_NAME'] = 'test_db';
+process.env['AWS_DYNAMODB_TABLE'] = 'test-auth-tokens';
+process.env['WEBHOOK_EVENTS_TABLE_NAME'] = 'test-webhook-events';
 
 // Increase timeout for integration tests
 jest.setTimeout(30000);
@@ -32,5 +30,5 @@ global.console = {
 };
 
 // Mock fetch for API calls
-global.fetch = jest.fn();
+global.fetch = jest.fn() as unknown as typeof fetch;
 

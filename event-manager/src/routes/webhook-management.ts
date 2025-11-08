@@ -2,11 +2,9 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { WebhookService } from '../services/index';
 import { WebhookRegistration } from '../types/webhook.types';
-import EventManagerDatabaseService from '../services/database.service';
 
 const router = Router();
 const webhookService = new WebhookService();
-const dbService = new EventManagerDatabaseService();
 
 // Validation schemas
 const WebhookRegistrationSchema = z.object({
@@ -58,22 +56,7 @@ router.post('/register', async (req: Request, res: Response) => {
     const result = await webhookService.registerWebhook(shop, webhookData);
     
     if (result.success) {
-      // Store webhook registration in database
-      try {
-        await dbService.connect();
-        await dbService.createRegisteredWebhook({
-          shop_domain: shop,
-          topic: webhookData.topic,
-          webhook_url: webhookData.address,
-          webhook_id: result.data?.id || 0,
-          status: 'active'
-        });
-        console.log(`✅ Webhook registered and stored in database for shop: ${shop}, topic: ${webhookData.topic}`);
-      } catch (dbError) {
-        console.error('Failed to store webhook registration in database:', dbError);
-        // Don't fail the request if database storage fails
-      }
-      
+      console.log(`✅ Webhook registered via Shopify for shop: ${shop}, topic: ${webhookData.topic}`);
       return res.status(201).json(result);
     } else {
       return res.status(400).json(result);
@@ -104,23 +87,12 @@ router.get('/list', async (req: Request, res: Response) => {
       });
     }
 
-    // Get webhooks from both Shopify and our database
     const shopifyResult = await webhookService.listWebhooks(shop);
-    
-    // Also get webhooks from our database
-    let dbWebhooks: any[] = [];
-    try {
-      await dbService.connect();
-      dbWebhooks = await dbService.getRegisteredWebhooksByShop(shop);
-    } catch (dbError) {
-      console.error('Failed to get webhooks from database:', dbError);
-    }
-    
+
     if (shopifyResult.success) {
       return res.json({
         ...shopifyResult,
-        database_webhooks: dbWebhooks,
-        message: `Found ${shopifyResult.data?.length || 0} webhooks from Shopify and ${dbWebhooks.length} from database`
+        message: `Found ${shopifyResult.data?.length || 0} webhooks from Shopify`
       });
     } else {
       return res.status(400).json(shopifyResult);

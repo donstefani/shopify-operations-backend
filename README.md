@@ -83,7 +83,7 @@ graph TB
         
         subgraph "Data Layer"
             DynamoDB[(DynamoDB<br/>Products, Customers, Orders)]
-            RDS[(RDS MySQL<br/>Webhook Events)]
+            DynamoDBEvents[(DynamoDB<br/>Webhook Events)]
         end
         
         subgraph "Security"
@@ -119,7 +119,7 @@ graph TB
     %% Webhook Flow
     Shopify -->|Webhooks| EventAPI
     EventAPI -->|Get Token| AuthAPI
-    EventAPI -->|Store Events| RDS
+    EventAPI -->|Store Events| DynamoDBEvents
     EventAPI -->|Notify GraphQL| DynamoDB
     
     %% Configuration
@@ -211,10 +211,6 @@ operations-backend/
 │   │   └── handler.ts         # Apollo Server handler
 │   └── serverless.yml
 │
-├── shared/                    # Shared utilities package
-│   ├── database/              # MySQL connection utilities
-│   └── __tests__/             # Tests (35 tests, 100% coverage)
-│
 └── README.md                  # This file
 ```
 
@@ -227,7 +223,6 @@ operations-backend/
 - **Node.js**: 22+ (LTS) - all services require Node 22
 - **AWS CLI**: Configured with appropriate credentials
 - **Serverless Framework**: v4.x (`npm install -g serverless`)
-- **MySQL**: 8+ (for local development)
 
 ### Installation
 
@@ -235,9 +230,6 @@ operations-backend/
    ```bash
    git clone <repository-url>
    cd shopify-operations-manager/operations-backend
-   
-   # Install shared dependencies first
-   cd shared && npm install && npm run build && cd ..
    
    # Install all services
    cd auth-service && npm install && cd ..
@@ -343,17 +335,10 @@ GraphQL API for order management, filtering, status updates, and revenue analyti
 ### 📊 Event Manager
 **Purpose:** Real-time webhook processing and event management  
 **API Type:** REST (Express.js)  
-**Key Tech:** Express.js, GraphQL, MySQL, AWS Lambda, Shopify SDK  
+**Key Tech:** Express.js, GraphQL, DynamoDB, AWS Lambda, Shopify SDK  
 **Status:** ✅ Production-ready (48 tests)  
 
-Processes webhooks for products, orders, customers, and app events. Features HMAC verification, automatic retries, throttling, GraphQL client for data enrichment.
-
-### 🧰 Shared Package
-**Purpose:** Common database utilities and configurations  
-**Key Tech:** MySQL2, TypeScript, Connection pooling  
-**Status:** ✅ Production-ready (35 tests, 100% coverage)  
-
-MySQL connection management, service-specific configurations, common database operations used across all services.
+Processes webhooks for products, orders, customers, and app events. Features HMAC verification, automatic retries, throttling, GraphQL client for data enrichment, and DynamoDB-backed event history.
 
 ---
 
@@ -1120,7 +1105,7 @@ The Event Manager is the webhook processing engine for Shopify events. It handle
 - **HMAC Verification**: Validates webhook authenticity using Shopify signatures
 - **Event Processing**: Processes different event types (products, orders, customers, app)
 - **Data Enrichment**: Fetches additional data from Shopify API when needed
-- **Database Logging**: Stores all events in MySQL for analytics and debugging
+- **Event Logging**: Stores webhook payloads in DynamoDB for analytics and debugging
 - **Webhook Management**: API to register, list, and manage webhooks programmatically
 
 **Why it exists:** Shopify webhooks require reliable processing with proper verification, retry logic, and data storage. This service centralizes all webhook handling.
@@ -1137,9 +1122,8 @@ The Event Manager is the webhook processing engine for Shopify events. It handle
 {
   "@shopify/shopify-api": "^11.14.1",         // Official Shopify SDK
   "@shopify/graphql-client": "^1.4.1",        // GraphQL client
-  "@aws-sdk/client-dynamodb": "^3.699.0",     // Token retrieval
-  "@operations-manager/shared": "file:../shared", // Shared utilities
-  "mysql2": "^3.6.5",                          // Database client
+  "@aws-sdk/client-dynamodb": "^3.699.0",     // DynamoDB client
+  "@aws-sdk/lib-dynamodb": "^3.699.0",        // Document client helpers
   "zod": "^4.1.7",                             // Schema validation
   "helmet": "^7.1.0",                          // Security headers
   "serverless-http": "^4.0.0"                  // Lambda adapter
@@ -1149,8 +1133,7 @@ The Event Manager is the webhook processing engine for Shopify events. It handle
 **AWS Services:**
 - AWS Lambda - Serverless compute
 - API Gateway - HTTP endpoints
-- DynamoDB - Token retrieval (shared with Auth Service)
-- RDS MySQL - Event storage
+- DynamoDB - Token retrieval and webhook event storage
 - Parameter Store - Secure configuration
 - CloudWatch - Logging and monitoring
 
@@ -1254,14 +1237,12 @@ curl "https://<endpoint>/health"
 | `/shopify-events/SHOPIFY_CLIENT_SECRET` | Shopify app secret | Yes |
 | `/shopify-events/SHOPIFY_WEBHOOK_SECRET` | Webhook HMAC secret | Yes |
 | `/shopify-events/ENCRYPTION_KEY` | Token decryption key (same as auth-service) | Yes |
-| `/shopify-events/DB_HOST` | MySQL host | Yes |
-| `/shopify-events/DB_USER` | MySQL username | Yes |
-| `/shopify-events/DB_PASSWORD` | MySQL password | Yes |
-| `/shopify-events/DB_NAME` | MySQL database name | Yes |
+| `/shopify-events/WEBHOOK_EVENTS_TABLE_NAME` | DynamoDB table for webhook events | Yes |
 
 **Other Configuration:**
 - `SHOPIFY_API_VERSION`: 2025-07 (hardcoded, update as needed)
-- `AWS_DYNAMODB_TABLE`: portfolio-shopify-auth
+- `AWS_DYNAMODB_TABLE`: portfolio-shopify-auth (shared token store)
+- `WEBHOOK_EVENTS_TABLE_NAME`: operations-event-manager-webhook-events-dev (override per stage)
 - `NODE_ENV`: development | production
 - `LOG_LEVEL`: debug | info | warn | error
 
@@ -1343,13 +1324,13 @@ console.error('Webhook processing failed', {
 ### Known Limitations & TODOs
 
 **Current Limitations:**
-- ⚠️ Database logging skipped in Lambda without VPC configuration
+- ⚠️ Event retention limited to 30 days via DynamoDB TTL
 - ⚠️ No dead letter queue for failed webhooks
 - ⚠️ GraphQL data enrichment may timeout on large products
 - ⚠️ No webhook event replay mechanism
 
 **Planned Improvements:**
-- [ ] VPC configuration for RDS access from Lambda
+- [ ] DynamoDB stream for long-term event archival
 - [ ] SQS dead letter queue for failed events
 - [ ] Webhook event replay API
 - [ ] GraphQL query optimization
@@ -1376,147 +1357,6 @@ Similar GraphQL architecture to Product Manager:
 - Fulfillment status management
 
 Both follow the same patterns as Product Manager with DynamoDB storage and Apollo Server deployment.
-
----
-
-## 5. Shared Package
-
-### Purpose & Responsibilities
-
-The Shared Package provides common utilities and configurations used across all microservices:
-
-- **Database Connection Management**: MySQL connection pooling with automatic reconnection
-- **Service-Specific Configurations**: Pre-configured settings for each microservice
-- **Type Definitions**: Common TypeScript types and interfaces
-- **Connection Lifecycle**: Singleton pattern for connection reuse in Lambda
-
-**Why it exists:** Prevents code duplication, ensures consistent database access patterns, and provides a single source of truth for shared functionality.
-
-### Tech Stack & Dependencies
-
-**Core:**
-- TypeScript 5.0+ - Type-safe development
-- MySQL2 3.6.5 - MySQL client with promise support
-
-**Testing:**
-- Jest 29.7.0 - Testing framework
-- ts-jest 29.1.2 - TypeScript integration
-
-### Package Exports
-
-The package uses modern Node.js package exports:
-
-```json
-{
-  "./database": {
-    "types": "./dist/database/index.d.ts",
-    "default": "./dist/database/index.js"
-  },
-  "./types": {
-    "types": "./dist/types/index.d.ts",
-    "default": "./dist/types/index.js"
-  }
-}
-```
-
-**Usage in other services:**
-```typescript
-import { DatabaseConnection } from '@operations-manager/shared/database';
-
-const db = DatabaseConnection.getInstance('event-manager');
-const result = await db.queryOne('SELECT * FROM webhook_events WHERE id = ?', [eventId]);
-```
-
-### Configuration
-
-Each service has pre-configured database settings:
-
-```typescript
-const serviceConfigs = {
-  'event-manager': {
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'operations_manager',
-    connectionLimit: 10
-  },
-  'customer-manager': { /* ... */ },
-  'order-manager': { /* ... */ },
-  'product-manager': { /* ... */ }
-};
-```
-
-### Run/Test Commands
-
-```bash
-# Development
-npm run build            # Compile TypeScript
-npm run dev              # Watch mode
-
-# Testing
-npm test                 # Run all tests
-npm run test:unit        # Unit tests only
-npm run test:integration # Integration tests
-npm run test:coverage    # Generate coverage report
-npm run test:watch       # Watch mode
-
-# Cleanup
-npm run clean            # Remove dist folder
-```
-
-### Key Features
-
-**Connection Pooling:**
-- Singleton pattern ensures one pool per service
-- Automatic connection reuse in Lambda
-- Configurable pool size per service
-- Graceful shutdown support
-
-**Query Methods:**
-```typescript
-// Execute query (no results expected)
-await db.execute('UPDATE products SET status = ?', ['active']);
-
-// Query single row
-const product = await db.queryOne('SELECT * FROM products WHERE id = ?', [123]);
-
-// Query multiple rows
-const products = await db.queryAll('SELECT * FROM products WHERE vendor = ?', ['Nike']);
-```
-
-**Error Handling:**
-- Connection errors caught and logged
-- Automatic retry on connection loss
-- Graceful fallback for missing configuration
-
-### Testing
-
-**100% Coverage Achievement:**
-- 35 passing tests
-- 100% statement coverage
-- 100% function coverage
-- 100% line coverage
-
-**Test Categories:**
-- Connection configuration tests
-- Pool management tests
-- Query execution tests
-- Service-specific configuration tests
-- Error handling tests
-
-### Known Limitations & TODOs
-
-**Current Limitations:**
-- ⚠️ No connection health checks
-- ⚠️ No query result caching
-- ⚠️ No migration management
-
-**Planned Improvements:**
-- [ ] Connection health check endpoint
-- [ ] Query result caching layer
-- [ ] Database migration system
-- [ ] Transaction support helpers
-- [ ] Query builder utilities
 
 ---
 
@@ -1677,11 +1517,7 @@ Access via IAM roles with least privilege.
 - 48 tests passing
 - Webhook processing
 - GraphQL client
-- Database logging
-
-**Shared Package:**
-- 35 tests passing
-- 100% coverage
+- Event logging (DynamoDB)
 
 **Total: 156+ passing tests** ✅
 

@@ -59,7 +59,7 @@ export class ProductService {
         hasNextPage: !!result.lastEvaluatedKey,
         endCursor,
       },
-      totalCount: result.count,
+      totalCount: result.totalCount,
     };
   }
 

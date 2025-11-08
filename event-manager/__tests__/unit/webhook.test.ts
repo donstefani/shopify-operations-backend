@@ -1,28 +1,17 @@
+import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { webhookHandlerRegistry } from '../../src/webhooks/services/index';
 import { WEBHOOK_TOPICS } from '../../src/webhooks/types/index';
-
-// Mock the database service
-jest.mock('../../src/services/database.service', () => {
-  return jest.fn().mockImplementation(() => ({
-    connect: jest.fn().mockResolvedValue(undefined),
-    disconnect: jest.fn().mockResolvedValue(undefined),
-    createWebhookEvent: jest.fn().mockResolvedValue(1),
-    updateWebhookEventStatus: jest.fn().mockResolvedValue(undefined),
-    logWebhookEvent: jest.fn().mockResolvedValue({
-      id: 1,
-      success: true
-    }),
-    getConnection: jest.fn().mockReturnValue({
-      query: jest.fn().mockResolvedValue([[], []]),
-      execute: jest.fn().mockResolvedValue([[], []])
-    })
-  }));
-});
 
 // Create mock functions first
 const mockGetProduct = jest.fn();
 const mockGetOrder = jest.fn();
 const mockGetCustomer = jest.fn();
+
+const createAsyncVoidMock = () => {
+  const mock = jest.fn() as jest.Mock;
+  mock.mockImplementation(async () => undefined);
+  return mock;
+};
 
 // Mock GraphQL clients
 jest.mock('../../src/services/clients/index', () => ({
@@ -40,16 +29,16 @@ jest.mock('../../src/services/clients/index', () => ({
 // Mock error handling service
 jest.mock('../../src/services/core/error-handling.service', () => ({
   errorHandlingService: {
-    handleError: jest.fn().mockResolvedValue(undefined),
-    handleGraphQLError: jest.fn().mockResolvedValue(undefined),
-    handleWebhookError: jest.fn().mockResolvedValue(undefined)
+    handleError: createAsyncVoidMock(),
+    handleGraphQLError: createAsyncVoidMock(),
+    handleWebhookError: createAsyncVoidMock()
   }
 }));
 
 describe('Webhook Handler Registry', () => {
   beforeEach(() => {
     // Set up product client mock
-    mockGetProduct.mockResolvedValue({
+    (mockGetProduct as jest.Mock).mockImplementation(async () => ({
       success: true,
       data: {
         data: {
@@ -63,10 +52,10 @@ describe('Webhook Handler Registry', () => {
           }
         }
       }
-    });
+    }));
 
     // Set up order client mock
-    mockGetOrder.mockResolvedValue({
+    (mockGetOrder as jest.Mock).mockImplementation(async () => ({
       success: true,
       data: {
         data: {
@@ -77,7 +66,7 @@ describe('Webhook Handler Registry', () => {
           }
         }
       }
-    });
+    }));
   });
 
   test('should handle product creation webhook', async () => {
